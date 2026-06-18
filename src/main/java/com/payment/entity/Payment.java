@@ -11,7 +11,6 @@ import java.util.List;
 @Entity
 @Table(name="payments")
 @Getter
-
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -34,6 +33,7 @@ public class Payment {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    @Builder.Default
     @OneToMany(mappedBy = "payment",cascade = CascadeType.ALL,fetch = FetchType.LAZY)
     private List<Transaction> transactions = new ArrayList<>();
 

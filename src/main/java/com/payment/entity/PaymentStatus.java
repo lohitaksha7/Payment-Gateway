@@ -1,13 +1,28 @@
 package com.payment.entity;
 
+import java.util.Set;
+
 public enum PaymentStatus {
-    CREATED,
 
-    PROCESSING,
+    REFUNDED(Set.of()),
+    FAILED(Set.of()),
+    SUCCESS(Set.of(PaymentStatus.REFUNDED)),
+    PROCESSING(Set.of(PaymentStatus.SUCCESS, PaymentStatus.FAILED)),
+    CREATED(Set.of(PaymentStatus.PROCESSING));
 
-    SUCCESS,
+    private final Set<PaymentStatus> allowedTransactions;
 
-    FAILED,
+    PaymentStatus(Set<PaymentStatus> allowedTransactions){
+        this.allowedTransactions = allowedTransactions;
+    }
 
-    REFUNDED
+    public boolean canTransactionTo(PaymentStatus next){
+        return allowedTransactions.contains(next);
+    }
+
+    public Set<PaymentStatus> getAllowedTransactions(){
+        return allowedTransactions;
+    }
 }
+
+

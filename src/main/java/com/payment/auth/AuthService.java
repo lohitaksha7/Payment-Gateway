@@ -59,5 +59,4 @@ public class AuthService {
                 .name(user.getName())
                 .build();
     }
-
 }

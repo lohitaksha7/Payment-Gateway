@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 @Data
 @Builder
+
 public class PaymentResponse {
     private Long id;
     private double amount;
