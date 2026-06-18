@@ -34,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final  TransactionRecordService transactionRecordService;
+    private final PaymentEventPublisher paymentEventPublisher;
 
     @Transactional(rollbackFor = Exception.class)
     @Retryable(
@@ -58,7 +59,10 @@ public class PaymentService {
                 "Payment created with amount "+ request.getAmount() +" in "+
                         request.getCurrency()
         );
-        log.info("Payment created with id: {}", saved.getId());
+
+        paymentEventPublisher.PublishPaymentCreated(saved);
+
+        log.info("Payment created and event published with id: {}", saved.getId());
         return mapToResponse(saved);
     }
 

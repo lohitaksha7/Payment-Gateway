@@ -25,8 +25,8 @@ public class PaymentController {
         
         PaymentResponse response = paymentService.createPayment(request);
         return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Payment created successfully.", response));
+                .status(HttpStatus.ACCEPTED)
+                .body(ApiResponse.success("Payment accepted for processing.", response));
     }
 
     @PatchMapping("/{id}/status")
