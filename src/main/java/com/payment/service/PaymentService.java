@@ -11,6 +11,8 @@ import com.payment.repository.PaymentRepository;
 import com.payment.repository.TransactionRepository;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DataAccessException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -36,6 +38,7 @@ public class PaymentService {
     private final  TransactionRecordService transactionRecordService;
     private final PaymentEventPublisher paymentEventPublisher;
 
+    @Cacheable(value = "payments", key = "#id")
     @Transactional(rollbackFor = Exception.class)
     @Retryable(
             retryFor = { SQLException.class },
@@ -87,6 +90,7 @@ public class PaymentService {
                 .toList();
     }
 
+    @CacheEvict(value = "payments", key = "#id")
     @Transactional(
             rollbackFor = Exception.class,
             isolation = Isolation.REPEATABLE_READ
@@ -144,6 +148,7 @@ public class PaymentService {
         );
     }
 
+    @CacheEvict(value = "payments", key = "#id")
     @Transactional(
             rollbackFor = Exception.class,
             isolation = Isolation.REPEATABLE_READ

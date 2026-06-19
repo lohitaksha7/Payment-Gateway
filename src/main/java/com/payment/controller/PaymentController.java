@@ -8,9 +8,14 @@ import com.payment.dto.PaymentUpdateRequest;
 import com.payment.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.apache.kafka.shaded.com.google.protobuf.Api;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.redis.core.RedisTemplate;
+import tools.jackson.databind.ObjectMapper;
+
+import java.util.concurrent.TimeUnit;
 
 import java.util.*;
 
@@ -19,14 +24,52 @@ import java.util.*;
 @RequiredArgsConstructor
 public class PaymentController {
     private final PaymentService paymentService;
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final ObjectMapper objectMapper;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<PaymentResponse>> createPayment(@Valid @RequestBody PaymentRequest request){
-        
-        PaymentResponse response = paymentService.createPayment(request);
-        return ResponseEntity
-                .status(HttpStatus.ACCEPTED)
-                .body(ApiResponse.success("Payment accepted for processing.", response));
+    public ResponseEntity<ApiResponse<PaymentResponse>> createPayment(
+            @Valid @RequestBody PaymentRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
+    ){
+        if(idempotencyKey == null || idempotencyKey.trim().isEmpty()){
+            PaymentResponse response = paymentService.createPayment(request);
+            return ResponseEntity
+                    .status(HttpStatus.ACCEPTED)
+                    .body(ApiResponse.success("Payment Request accepted for processing", response));
+        }
+
+        String redisKey = "Idempotency:"+idempotencyKey;
+
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(redisKey,"processing",10,TimeUnit.SECONDS);
+
+        if(Boolean.FALSE.equals(acquired)){
+            Object cachedValue = redisTemplate.opsForValue().get(redisKey);
+            if("processing".equals(cachedValue)){
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(ApiResponse.error("A duplicate payment request is currently being processed. Please wait."));
+            }
+            if(cachedValue!=null){
+                try{
+                    PaymentResponse cachedResponse = objectMapper.convertValue(cachedValue, PaymentResponse.class);
+                    return ResponseEntity.ok(ApiResponse.success("Payment request already completed(cached).",cachedResponse));
+                }
+                catch (IllegalArgumentException e){
+                    redisTemplate.delete(redisKey);
+                }
+            }
+
+        }
+
+        try{
+            PaymentResponse response = paymentService.createPayment(request);
+            redisTemplate.opsForValue().set(redisKey,response,24,TimeUnit.HOURS);
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(ApiResponse.success("Payment Request accepted for processing.", response));
+        }catch (Exception e){
+            redisTemplate.delete(redisKey);
+            throw e;
+        }
     }
 
     @PatchMapping("/{id}/status")
