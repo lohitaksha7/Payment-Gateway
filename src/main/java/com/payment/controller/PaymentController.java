@@ -1,6 +1,7 @@
 package com.payment.controller;
 
 import com.payment.entity.Payment;
+import com.payment.entity.User;
 import com.payment.service.PaymentService;
 import com.payment.dto.PaymentRequest;
 import com.payment.dto.PaymentResponse;
@@ -11,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.apache.kafka.shaded.com.google.protobuf.Api;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.data.redis.core.RedisTemplate;
 import tools.jackson.databind.ObjectMapper;
@@ -32,8 +35,12 @@ public class PaymentController {
             @Valid @RequestBody PaymentRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ){
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        User currentUser = (User) auth.getPrincipal();
+        Long merchantId = currentUser.getId();
+
         if(idempotencyKey == null || idempotencyKey.trim().isEmpty()){
-            PaymentResponse response = paymentService.createPayment(request);
+            PaymentResponse response = paymentService.createPayment(request,merchantId);
             return ResponseEntity
                     .status(HttpStatus.ACCEPTED)
                     .body(ApiResponse.success("Payment Request accepted for processing", response));
@@ -62,7 +69,7 @@ public class PaymentController {
         }
 
         try{
-            PaymentResponse response = paymentService.createPayment(request);
+            PaymentResponse response = paymentService.createPayment(request,merchantId);
             redisTemplate.opsForValue().set(redisKey,response,24,TimeUnit.HOURS);
             return ResponseEntity.status(HttpStatus.ACCEPTED)
                     .body(ApiResponse.success("Payment Request accepted for processing.", response));

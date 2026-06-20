@@ -37,6 +37,9 @@ public class Payment {
     @OneToMany(mappedBy = "payment",cascade = CascadeType.ALL,fetch = FetchType.LAZY)
     private List<Transaction> transactions = new ArrayList<>();
 
+    @Column(name = "merchant_id", nullable = false)
+    private Long merchantId;
+
     @PrePersist
     void onCreate(){
         this.createdAt = LocalDateTime.now();

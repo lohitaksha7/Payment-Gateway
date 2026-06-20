@@ -1,5 +1,6 @@
 package com.payment.service;
 
+import com.payment.Event.PaymentStatusEvent;
 import com.payment.dto.PaymentRequest;
 import com.payment.dto.PaymentResponse;
 import com.payment.dto.PaymentUpdateRequest;
@@ -13,6 +14,7 @@ import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -37,6 +39,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final  TransactionRecordService transactionRecordService;
     private final PaymentEventPublisher paymentEventPublisher;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Cacheable(value = "payments", key = "#id")
     @Transactional(rollbackFor = Exception.class)
@@ -45,14 +48,15 @@ public class PaymentService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
-    public PaymentResponse createPayment(PaymentRequest request){
-        log.info("Creating payment: amount={}, currency={}",
-                request.getAmount(), request.getCurrency());
+    public PaymentResponse createPayment(PaymentRequest request, Long merchantId){
+        log.info("Creating payment: amount={}, currency={}, merchantID={}",
+                request.getAmount(), request.getCurrency(), merchantId);
 
         Payment payment = Payment.builder()
                 .amount(request.getAmount())
                 .currency(request.getCurrency())
                 .status(PaymentStatus.CREATED)
+                .merchantId(merchantId)
                 .build();
 
         Payment saved = paymentRepository.save(payment);
@@ -66,6 +70,7 @@ public class PaymentService {
         paymentEventPublisher.PublishPaymentCreated(saved);
 
         log.info("Payment created and event published with id: {}", saved.getId());
+        eventPublisher.publishEvent(new PaymentStatusEvent(this, merchantId, mapToResponse(saved)));
         return mapToResponse(saved);
     }
 
@@ -125,6 +130,7 @@ public class PaymentService {
                         +currentStatus+" to "+ newStatus
         );
         log.info("Payment id={} successfully transitioned: {} → {}", id, currentStatus, newStatus);
+        eventPublisher.publishEvent(new PaymentStatusEvent(this, updated.getMerchantId(),mapToResponse(updated)));
         return mapToResponse(updated);
     }
 
