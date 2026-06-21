@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.security.access.AccessDeniedException;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -131,6 +132,14 @@ public class PaymentService {
         );
         log.info("Payment id={} successfully transitioned: {} → {}", id, currentStatus, newStatus);
         eventPublisher.publishEvent(new PaymentStatusEvent(this, updated.getMerchantId(),mapToResponse(updated)));
+        if(newStatus == PaymentStatus.SUCCESS){
+            paymentEventPublisher.PublishPaymentSucceeded(updated);
+        }else if(newStatus == PaymentStatus.FAILED) {
+            paymentEventPublisher.PublishPaymentFailed(updated,"Transaction declined by external mock gateway");
+        }else if(newStatus == PaymentStatus.REFUNDED){
+            paymentEventPublisher.PublishRefundCreated(updated);
+        }
+
         return mapToResponse(updated);
     }
 
@@ -184,6 +193,24 @@ public class PaymentService {
         }
         return Math.random()>0.1;
     }
+
+
+    @CacheEvict(value = "payments", key = "#id")
+    @Transactional(
+            rollbackFor = Exception.class,
+            isolation = Isolation.REPEATABLE_READ
+    )
+    public PaymentResponse refundPayment(Long id, Long merchantId){
+        log.info("Procecssing refund for payment id={} requested by merchant id= {}",id,merchantId);
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(()->  new PaymentNotFoundException("payment not founnd with id: "+id));
+
+        if(!payment.getMerchantId().equals(merchantId)){
+            throw new AccessDeniedException("You don't have permission to refund this payment");
+        }
+        return updatePaymentStatus(id, new PaymentUpdateRequest(PaymentStatus.REFUNDED));
+    }
+
 
     private PaymentResponse mapToResponse(Payment payment){
         return PaymentResponse.builder()

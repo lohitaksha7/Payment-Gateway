@@ -79,6 +79,18 @@ public class PaymentController {
         }
     }
 
+    @PostMapping("/{id}/refund")
+    public ResponseEntity<ApiResponse<PaymentResponse>> refundPayment(@PathVariable Long id){
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        User currentUser = (User) auth.getPrincipal();
+        Long merchantId = currentUser.getId();
+
+        PaymentResponse response = paymentService.refundPayment(id,merchantId);
+        return ResponseEntity.ok(ApiResponse.success(
+            "Payment successfully refunded",response
+        ));
+    }
+
     @PatchMapping("/{id}/status")
     public ResponseEntity<ApiResponse<PaymentResponse>> updatePaymentStatus(
             @PathVariable Long id,
@@ -104,4 +116,5 @@ public class PaymentController {
             ApiResponse.success("Payment fetched successfully.",response)
         );
     }
+
 }
