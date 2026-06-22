@@ -16,6 +16,7 @@ public class PaymentResponse {
     private double amount;
     private String currency;
     private String status;
+    private int fraudScore;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

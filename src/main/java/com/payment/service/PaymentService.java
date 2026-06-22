@@ -6,6 +6,7 @@ import com.payment.dto.PaymentResponse;
 import com.payment.dto.PaymentUpdateRequest;
 import com.payment.entity.Payment;
 import com.payment.entity.PaymentStatus;
+import com.payment.exception.FraudSuspicionException;
 import com.payment.exception.InvalidStatusTransitionException;
 import com.payment.exception.PaymentNotFoundException;
 import com.payment.repository.PaymentRepository;
@@ -41,6 +42,7 @@ public class PaymentService {
     private final  TransactionRecordService transactionRecordService;
     private final PaymentEventPublisher paymentEventPublisher;
     private final ApplicationEventPublisher eventPublisher;
+    private final FraudDetectionService fraudDetectionService;
 
     @Cacheable(value = "payments", key = "#id")
     @Transactional(rollbackFor = Exception.class)
@@ -53,11 +55,18 @@ public class PaymentService {
         log.info("Creating payment: amount={}, currency={}, merchantID={}",
                 request.getAmount(), request.getCurrency(), merchantId);
 
+        int fraudScore = fraudDetectionService.detectFraud(request,merchantId,"127.0.0.1");
+
+        if (fraudScore >= 80) {
+            throw new FraudSuspicionException("High risk transaction blocked.");
+        }
+
         Payment payment = Payment.builder()
                 .amount(request.getAmount())
                 .currency(request.getCurrency())
                 .status(PaymentStatus.CREATED)
                 .merchantId(merchantId)
+                .fraudScore(fraudScore)
                 .build();
 
         Payment saved = paymentRepository.save(payment);
@@ -201,7 +210,7 @@ public class PaymentService {
             isolation = Isolation.REPEATABLE_READ
     )
     public PaymentResponse refundPayment(Long id, Long merchantId){
-        log.info("Procecssing refund for payment id={} requested by merchant id= {}",id,merchantId);
+        log.info("Processing refund for payment id={} requested by merchant id= {}",id,merchantId);
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(()->  new PaymentNotFoundException("payment not founnd with id: "+id));
 
@@ -218,6 +227,7 @@ public class PaymentService {
                 .amount(payment.getAmount())
                 .currency(payment.getCurrency())
                 .status(payment.getStatus().name())
+                .fraudScore(payment.getFraudScore())
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();

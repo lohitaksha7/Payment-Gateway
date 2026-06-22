@@ -1,5 +1,6 @@
 package com.payment.exception;
 
+import com.payment.dto.ApiResponse;
 import org.springframework.cglib.core.Local;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +46,12 @@ public class GlobalExceptionHandler {
                         "error", ex.getMessage(),
                         "timestamp", LocalDateTime.now().toString()
                 ));
+    }
+
+    @ExceptionHandler(FraudSuspicionException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFraudSuspicion(com.payment.exception.FraudSuspicionException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("Transaction declined: Security risk check failed."));
     }
 }
 

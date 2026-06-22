@@ -40,6 +40,9 @@ public class Payment {
     @Column(name = "merchant_id", nullable = false)
     private Long merchantId;
 
+    @Column(name = "fraud_score")
+    private int fraudScore;
+
     @PrePersist
     void onCreate(){
         this.createdAt = LocalDateTime.now();
